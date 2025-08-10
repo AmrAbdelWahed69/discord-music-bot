@@ -8,6 +8,9 @@
   },
   "author": "",
   "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "dependencies": {
     "discord.js": "^14.13.0",
     "distube": "^4.0.4",
