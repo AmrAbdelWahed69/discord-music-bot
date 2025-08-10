@@ -1,45 +1,72 @@
-require("dotenv").config();
-const { Client, GatewayIntentBits } = require("discord.js");
-const { DisTube } = require("distube");
-const { joinVoiceChannel } = require("@discordjs/voice");
+const { Client, GatewayIntentBits, Partials } = require('discord.js');
+const { DisTube } = require('distube');
+const { YtDlpPlugin } = require('@distube/yt-dlp');
+require('dotenv').config();
 
+// إنشاء العميل (Client)
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildVoiceStates,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
-  ]
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.GuildVoiceStates,
+        GatewayIntentBits.MessageContent
+    ],
+    partials: [Partials.Channel]
 });
 
+// إعداد DisTube
 const distube = new DisTube(client, {
-  searchSongs: 5,
-  emitNewSongOnly: true
+    emitNewSongOnly: true,
+    leaveOnEmpty: true,
+    leaveOnFinish: true,
+    leaveOnStop: true,
+    plugins: [new YtDlpPlugin()]
 });
 
-client.once("ready", () => {
-  console.log(`✅ Logged in as ${client.user.tag}`);
+// تسجيل الدخول
+client.once('ready', () => {
+    console.log(`✅ Logged in as ${client.user.tag}`);
 });
 
-client.on("messageCreate", async (message) => {
-  if (!message.content.startsWith("!")) return;
+// أوامر بسيطة للتشغيل
+client.on('messageCreate', async (message) => {
+    if (message.author.bot || !message.guild) return;
 
-  const args = message.content.slice(1).trim().split(/ +/);
-  const command = args.shift().toLowerCase();
+    const prefix = '!';
+    if (!message.content.startsWith(prefix)) return;
 
-  if (command === "play") {
-    if (!message.member.voice.channel)
-      return message.reply("🚫 لازم تكون في روم صوتي!");
-    distube.play(message.member.voice.channel, args.join(" "), {
-      textChannel: message.channel,
-      member: message.member
+    const args = message.content.slice(prefix.length).trim().split(/ +/g);
+    const command = args.shift().toLowerCase();
+
+    if (command === 'play') {
+        const voiceChannel = message.member?.voice?.channel;
+        if (!voiceChannel) return message.reply('🎤 لازم تكون في روم صوتي الأول.');
+        distube.play(voiceChannel, args.join(' '), { textChannel: message.channel, member: message.member });
+    }
+
+    if (command === 'stop') {
+        distube.stop(message);
+        message.channel.send('⏹️ تم إيقاف الموسيقى.');
+    }
+
+    if (command === 'skip') {
+        distube.skip(message);
+        message.channel.send('⏭️ تم تخطي الأغنية.');
+    }
+});
+
+// أحداث DisTube
+distube
+    .on('playSong', (queue, song) => {
+        queue.textChannel.send(`🎶 بيشتغل: **${song.name}** - \`${song.formattedDuration}\``);
+    })
+    .on('addSong', (queue, song) => {
+        queue.textChannel.send(`➕ تمت إضافة: **${song.name}** - \`${song.formattedDuration}\``);
+    })
+    .on('error', (channel, error) => {
+        console.error(error);
+        channel.send('❌ حصل خطأ.');
     });
-  }
 
-  if (command === "stop") {
-    distube.stop(message.guild);
-    message.channel.send("⏹️ تم إيقاف الموسيقى");
-  }
-});
-
+// تسجيل الدخول باستخدام التوكن من الـ.env
 client.login(process.env.DISCORD_TOKEN);
